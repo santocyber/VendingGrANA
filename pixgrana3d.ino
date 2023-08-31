@@ -23,8 +23,32 @@ int buttonState = 0;       // Variável para armazenar o estado do botão
 int Button1 = 0;  // Pino do botão
 
 int contacendled = 0;
-
 unsigned long intervalo = 0;
+
+
+
+#define LAST_ID_KEY             "last_id"
+
+uint8_t current_status;
+uint32_t tickNumber = 0;
+uint8_t segundos = 0;
+uint8_t minutos = 0;
+uint8_t horas = 0;
+
+uint8_t order_status;
+
+bool generate_qrcode;
+bool get_order_status;
+bool primeira_vez = true;
+
+char info[30];
+
+uint32_t last_id;
+
+static const char *TAG = "Main";
+
+
+
 
 // Setting clock just to be sure...
 void setClock() {
@@ -93,37 +117,27 @@ void loop() {
       intervalo = millis();}
 
 // se passar mais que 2 segundos entre os pressionar de botões, ele volta a zero e precisa pressionar duas vezes de novo      
-  if(millis() > intervalo+2000){
+  if(millis() > intervalo+4000){
   contacendled = 0;
 }    
- 
+   if(millis() > intervalo+2000){
+
  //  se a variavel contacendled chegar a 2 o que dizer que o botão 1 foi pressionado 2 vezes ele acende o led 1 
   if(contacendled == 2){
       neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
-            Serial.println("botao 2");
-
-
+      Serial.println("botao 2");
   }
-  
-  //  se a variavel contacendled chegar a 3 o que dizer que o botão 1 foi pressionado 2 vezes ele acende o led 1 
   if(contacendled == 3){
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
-        Serial.println("botao 3");
-
+  Serial.println("botao 3");       
   }
-
-
-
-   //  se a variavel contacendled chegar a 2 o que dizer que o botão 1 foi pressionado 2 vezes ele acende o led 1 
   if(contacendled == 1){
        neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
-
-            Serial.println("botao 1");
-            pix();
-
-
+       Serial.println("botao 1");
+       pix();
   }
 
+}   
 
       Serial.println(contacendled);
 
@@ -138,8 +152,8 @@ WiFiClient client;
   {
   Serial.println(F("connected"));
   
-  String CHAVEPHP = "?id=";
-         CHAVEPHP += "QRCODE";
+  String CHAVEPHP = "?id";
+         CHAVEPHP += "4";
 
 
 
@@ -251,6 +265,5 @@ WiFiClient client;
   client.stop();
   digitalWrite(RGB_BUILTIN, LOW);
 }
-    
-    
-    
+
+
