@@ -1,11 +1,12 @@
 
+
 #include <WiFi.h>
 #include "Arduino.h"
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
-#include "http_client.h"
+//#include <http_client.h>
 
-//#include <Arduino.h>
+#include <Arduino.h>
 
 #include <SPIFFS.h>
 #include <TFT_eSPI.h>
@@ -63,6 +64,8 @@ const char* host = "santocyber.helioho.st";
 String url = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url2 = "http://santocyber.helioho.st/pix-gateway/v1/api_orders.php";
 String url3 = "http://santocyber.helioho.st/pix-gateway/v1/api_webhook.php";
+String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
+int pagamento = 0;
 
 const int httpPort = 80;
 
@@ -160,23 +163,28 @@ void loop() {
       digitalWrite(RGB_BUILTIN, LOW);      
       intervalo = millis();}
 
-// se passar mais que 2 segundos entre os pressionar de botões, ele volta a zero e precisa pressionar duas vezes de novo      
   if(millis() > intervalo+4000){
   contacendled = 0;
 }    
    if(millis() > intervalo+2000){
 
   if(contacendled == 1){
+    //##########################################################################################
        Serial.println("botao 1");
        pix();
+       webhook();
  
   }
   if(contacendled == 2){
+  //##########################################################################################
+
       neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
       Serial.println("botao 2");
       orders();
   }
   if(contacendled == 3){
+  //##########################################################################################
+
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
   Serial.println("botao 3"); 
     webhook();      
@@ -228,8 +236,9 @@ WiFiClient client;
 
   client.print(F("GET ")); client.print(url); 
   client.print(CHAVEPHP.c_str());  
-  client.println(F(" HTTP/1.0")); 
-  client.println(F("Host: SomeHost"));
+  Serial.print(CHAVEPHP.c_str()); 
+  //client.println(F(" HTTP/1.1")); 
+ // client.println(F("Host: SomeHost"));
   client.println();
     neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
@@ -305,11 +314,19 @@ WiFiClient client;
   if (client.connect(host, 80)) 
   {
   Serial.println(F("connected"));
-  
+    
+    String CHAVE2PHP =  "?external_id=";
+           CHAVE2PHP +=  last_id;
+           CHAVE2PHP += "&order_status=";
+           CHAVE2PHP +=  pagamento;
 
-  client.print(F("POST ")); client.print(url3);  
-  client.println(F(" HTTP/1.0")); 
-  client.println(F("Host: SomeHost"));
+
+  client.print(F("GET ")); 
+  client.print(url4); 
+  client.print(CHAVE2PHP.c_str());  
+  Serial.println(CHAVE2PHP.c_str());  
+//  client.println(F(" HTTP/1.0")); 
+//  client.println(F("Host: SomeHost"));
   client.println();
     neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
