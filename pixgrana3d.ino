@@ -112,8 +112,10 @@ void loop() {
  if (buttonState == LOW) { // Se o botão estiver pressionado
  //if ( digitalRead(Button1)==1) {
       Serial.println("botao pressionado");
+      digitalWrite(RGB_BUILTIN, HIGH);
       contacendled++;
-      delay(500);       
+      delay(500); 
+      digitalWrite(RGB_BUILTIN, LOW);      
       intervalo = millis();}
 
 // se passar mais que 2 segundos entre os pressionar de botões, ele volta a zero e precisa pressionar duas vezes de novo      
@@ -129,10 +131,12 @@ void loop() {
   if(contacendled == 2){
       neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
       Serial.println("botao 2");
+      orders();
   }
   if(contacendled == 3){
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
-  Serial.println("botao 3");       
+  Serial.println("botao 3"); 
+    webhook();      
   }
    if(contacendled == 4){
   neopixelWrite(RGB_BUILTIN,0,60,78); 
@@ -156,12 +160,12 @@ WiFiClient client;
   {
   Serial.println(F("connected"));
   
-  String CHAVEPHP = "?id";
+  String CHAVEPHP = "?id=";
          CHAVEPHP += "4";
 
 
 
-  client.print(F("GET ")); client.print(url); client.print(CHAVEPHP);  
+  client.print(F("GET ")); client.print(url); client.print(CHAVEPHP.c_str());  
   client.println(F(" HTTP/1.0")); 
   client.println(F("Host: SomeHost"));
   client.println();
