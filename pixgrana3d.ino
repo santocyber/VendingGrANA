@@ -2,8 +2,60 @@
 #include <WiFi.h>
 #include "Arduino.h"
 #include <WiFiMulti.h>
-
 #include <HTTPClient.h>
+#include "http_client.h"
+
+//#include <Arduino.h>
+
+#include <SPIFFS.h>
+#include <TFT_eSPI.h>
+
+
+#include "qrcodegen.h"
+//#include <qrcodegen.h>
+
+#define BUTTON_INPUT 0
+#define ATUADOR 15
+#define INTERVAL 400
+
+#define STATUS_WAIT_USER_INPUT 0
+#define STATUS_REQUEST_QRCODE 1
+#define STATUS_CHECK_PAYMENT 2
+#define STATUS_ACTUATE_ON_GPIO 3
+
+#define LAST_ID_KEY "last_id"
+
+TFT_eSPI tft = TFT_eSPI();
+           
+uint8_t current_status;
+uint32_t tickNumber = 0;
+uint8_t segundos = 0;
+uint8_t minutos = 0;
+uint8_t horas = 0;
+
+uint8_t order_status;
+
+bool generate_qrcode;
+bool get_order_status;
+bool primeira_vez = true;
+
+char info[30];
+
+uint32_t last_id;
+
+void timer_tick_func();
+
+//void timer_configure();
+
+uint32_t read_nvs_data();
+
+void save_nvs_data(uint32_t data);
+char buffer[300];
+uint8_t qrcode[qrcodegen_BUFFER_LEN_MAX];
+uint8_t tempBuffer[qrcodegen_BUFFER_LEN_MAX];
+
+
+
 
 const char* ssid = "InternetSA";
 const char* password = "cadebabaca";
@@ -27,25 +79,6 @@ unsigned long intervalo = 0;
 
 
 
-#define LAST_ID_KEY             "last_id"
-
-uint8_t current_status;
-uint32_t tickNumber = 0;
-uint8_t segundos = 0;
-uint8_t minutos = 0;
-uint8_t horas = 0;
-
-uint8_t order_status;
-
-bool generate_qrcode;
-bool get_order_status;
-bool primeira_vez = true;
-
-char info[30];
-
-uint32_t last_id;
-
-static const char *TAG = "Main";
 
 
 
@@ -75,7 +108,16 @@ WiFiMulti WiFiMulti;
 
 void setup() {
 
+  current_status = STATUS_WAIT_USER_INPUT;
 
+  //timer_configure();
+
+  generate_qrcode = false;
+
+  tickNumber = 0;
+
+  last_id = read_nvs_data();
+  
 
   pinMode(Button1, INPUT); // Define o pino do botão como entrada
   pinMode(ledPin, OUTPUT);   // Define o pino do LED como saída
@@ -127,6 +169,7 @@ void loop() {
   if(contacendled == 1){
        Serial.println("botao 1");
        pix();
+ 
   }
   if(contacendled == 2){
       neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
@@ -154,18 +197,37 @@ void loop() {
 
   void pix(){
 WiFiClient client;
+         current_status = STATUS_REQUEST_QRCODE;
+          last_id++;
+          save_nvs_data(last_id);
+          sprintf(info, "Ultima Compra: %d", last_id);
+          tft.setCursor(10, 460);
+          tft.println(info);
+     
+
+  //http_get_qrcode(buffer, last_id);
+  // http_get_qrcode_test(buffer);
+  Serial.print("QR CODE: ");
+  Serial.println(buffer);
+  Serial.println("Gerando QR Code...");
+ // bool ok = qrcodegen_encodeText(buffer, tempBuffer, qrcode,
+    //qrcodegen_Ecc_HIGH, qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
 
 
   if (client.connect(host, 80)) 
   {
   Serial.println(F("connected"));
+
+
   
   String CHAVEPHP = "?id=";
-         CHAVEPHP += "4";
+         CHAVEPHP += last_id;
+         CHAVEPHP += "";
 
 
 
-  client.print(F("GET ")); client.print(url); client.print(CHAVEPHP.c_str());  
+  client.print(F("GET ")); client.print(url); 
+  client.print(CHAVEPHP.c_str());  
   client.println(F(" HTTP/1.0")); 
   client.println(F("Host: SomeHost"));
   client.println();
@@ -186,6 +248,7 @@ WiFiClient client;
     Serial.print(c);
     
   }
+  tickNumber++;
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
   delay(1000);
  
@@ -244,7 +307,7 @@ WiFiClient client;
   Serial.println(F("connected"));
   
 
-  client.print(F("GET ")); client.print(url3);  
+  client.print(F("POST ")); client.print(url3);  
   client.println(F(" HTTP/1.0")); 
   client.println(F("Host: SomeHost"));
   client.println();
@@ -272,6 +335,38 @@ WiFiClient client;
   Serial.println(F("Desconectando."));
   client.stop();
   digitalWrite(RGB_BUILTIN, LOW);
+}
+
+
+
+  
+
+uint32_t read_nvs_data()
+{
+  uint32_t last_id = 0;
+  if (SPIFFS.begin(true))
+  {
+    File nvsFile = SPIFFS.open("/nvs.txt", "r");
+    if (nvsFile)
+    {
+      last_id = nvsFile.parseInt();
+      nvsFile.close();
+    }
+  }
+  return last_id;
+}
+
+void save_nvs_data(uint32_t data)
+{
+  if (SPIFFS.begin(true))
+  {
+    File nvsFile = SPIFFS.open("/nvs.txt", "w");
+    if (nvsFile)
+    {
+      nvsFile.print(data);
+      nvsFile.close();
+    }
+  }
 }
 
 
