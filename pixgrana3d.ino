@@ -122,7 +122,10 @@ void loop() {
 }    
    if(millis() > intervalo+2000){
 
- //  se a variavel contacendled chegar a 2 o que dizer que o botão 1 foi pressionado 2 vezes ele acende o led 1 
+  if(contacendled == 1){
+       Serial.println("botao 1");
+       pix();
+  }
   if(contacendled == 2){
       neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
       Serial.println("botao 2");
@@ -131,15 +134,16 @@ void loop() {
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
   Serial.println("botao 3");       
   }
-  if(contacendled == 1){
-       neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
-       Serial.println("botao 1");
-       pix();
+   if(contacendled == 4){
+  neopixelWrite(RGB_BUILTIN,0,60,78); 
+  Serial.println("botao 4");       
   }
+
+
 
 }   
 
-      Serial.println(contacendled);
+     // Serial.println(contacendled);
 
 }
   
