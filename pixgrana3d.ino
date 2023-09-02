@@ -1,30 +1,49 @@
 
-
 #include <WiFi.h>
 #include "Arduino.h"
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
-//#include <http_client.h>
+WiFiClientSecure client;
 
-#include <Arduino.h>
+
+// Configuração do certificado CA (Certificado de Autoridade) para confiar no servidor remoto
+const char* caCert = \
+ "-----BEGIN CERTIFICATE-----\n"
+  "MIICtjCCAZ4CAQAwFTETMBEGA1UEAwwKdGVzLm9ibS5wdDCCASIwDQYJKoZIhvcN\n"
+  "AQEBBQADggEPADCCAQoCggEBANvuYarL3NB+2S4uGc8IftHLctFT8qKAzAcJt3yJ\n"
+  "iFa4dixMgxNMnNZ8t1iAMEIlm0exzQ9Jbhi0i27RGwXnUDU5sS9RESqc02ca3HSd\n"
+  "DBWCc3RYxetHJTJWAIam7D7qlsHTdLBAKUKKhytHD+uFYcC0D44IHfUmXmoQva9c\n"
+  "QNSWeFZJQOywcclQyaThjSpg9xbg09Nx1/JLRV4ocKMnSm1oR9EkGu1oI8ppgeQv\n"
+  "wrEyPYniRlNY0uT7K+NvCKZ46J1naPrnWwleqxp/JGfykH63u6s4VLZEQ7ibmAI3\n"
+  "WX3hXTcGYxcz3LvwZNjpRslAX3iFLr9docf0HjSbF70zcv0CAwEAAaBcMFoGCSqG\n"
+  "SIb3DQEJDjFNMEswCQYDVR0TBAIwADALBgNVHQ8EBAMCBeAwMQYDVR0RBCowKIIK\n"
+  "dGVzLm9ibS5wdIIMKi50ZXMub2JtLnB0ggwqLnRlcy5vYm0ucHQwDQYJKoZIhvcN\n"
+  "AQELBQADggEBALYRG8PoLow3R6Z7X9ZntRvHYksRhaUsgmOqgqB/H2SjEFZ0kTvY\n"
+  "0BIG98FFfHRG8omo/jlsPBBD/el8WzrBNRWvennpvWRteBheM5eSruHjZO5tOwHd\n"
+  "b+A6i8GmMpQVAzx31oM+fNXUzUDUGtltIxxIQMsclkqiGWuT56QZ2oZEtVTOmQP9\n"
+  "NPsmirCe0CfN47LgHz73X1wjp6nd09yloR/pFO4H+gruyh+NwnKp9wP4Pq/3i6g7\n"
+  "hl0mVBvlvMs/7Jt3guvcdSHPc2yyEiarRUPUxCzrjG8RRr7HpY7xkKYRI06ROPsj\n"
+  "LOYRaRnaPslLfcSXH1MsIjXRgq077tzeHdo=\n"
+  "-----END CERTIFICATE-----\n";
+
 
 #include <SPIFFS.h>
 #include <TFT_eSPI.h>
-
-
 #include "qrcodegen.h"
 //#include <qrcodegen.h>
 
 #define BUTTON_INPUT 0
 #define ATUADOR 15
 #define INTERVAL 400
-
 #define STATUS_WAIT_USER_INPUT 0
 #define STATUS_REQUEST_QRCODE 1
 #define STATUS_CHECK_PAYMENT 2
 #define STATUS_ACTUATE_ON_GPIO 3
-
 #define LAST_ID_KEY "last_id"
+
+#define RXD2 44
+#define TXD2 43
+
 
 TFT_eSPI tft = TFT_eSPI();
            
@@ -33,7 +52,6 @@ uint32_t tickNumber = 0;
 uint8_t segundos = 0;
 uint8_t minutos = 0;
 uint8_t horas = 0;
-
 uint8_t order_status;
 
 bool generate_qrcode;
@@ -64,20 +82,22 @@ const char* host = "santocyber.helioho.st";
 String url = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url2 = "http://santocyber.helioho.st/pix-gateway/v1/api_orders.php";
 String url3 = "http://santocyber.helioho.st/pix-gateway/v1/api_webhook.php";
+String url5 = "http://santocyber.helioho.st/pix-gateway/v1/api_teste.php";
 String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
 int pagamento = 0;
-
-const int httpPort = 80;
-
+int ordervalue = 0;
 
 const int ledPin = 48;     // Pino do LED
 
 // Variáveis para rastrear o estado do botão e os cliques
 int buttonState = 0;       // Variável para armazenar o estado do botão
+String State = "menu";
+String payload = "";
 
 int Button1 = 0;  // Pino do botão
 
 int contacendled = 0;
+int conta = 0;
 unsigned long intervalo = 0;
 
 
@@ -112,21 +132,21 @@ WiFiMulti WiFiMulti;
 void setup() {
 
   current_status = STATUS_WAIT_USER_INPUT;
-
-  //timer_configure();
-
   generate_qrcode = false;
-
   tickNumber = 0;
-
   last_id = read_nvs_data();
   
 
   pinMode(Button1, INPUT); // Define o pino do botão como entrada
   pinMode(ledPin, OUTPUT);   // Define o pino do LED como saída
 
-  
+
+    // Note the format for setting a serial port is as follows: Serial2.begin(baud-rate, protocol, RX pin, TX pin);
   Serial.begin(115200);
+  //Serial1.begin(115200);
+
+   Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
+  
   // Serial.setDebugOutput(true);
 
   Serial.println();
@@ -152,11 +172,35 @@ void setup() {
 void loop() {
 
 
+ if (State == "menu") {
+  menu();
+ }
+  
+ if(State == "valor"){
+    geravalor();
+}
+ if(State == "pix"){      
+    pix();
+    webhook();
+    ordervalue = 0;
+    conta = 0;
+    State = "menu";
+
+}
+
+}
+  
+void menu(){
+     // Serial.println("MENU");
+
+
+  
     buttonState = digitalRead(Button1); // Lê o estado do botão
 
  if (buttonState == LOW) { // Se o botão estiver pressionado
- //if ( digitalRead(Button1)==1) {
-      Serial.println("botao pressionado");
+      Serial.println("botao pressionado MENU");
+      Serial.println(contacendled);
+
       digitalWrite(RGB_BUILTIN, HIGH);
       contacendled++;
       delay(500); 
@@ -170,10 +214,10 @@ void loop() {
 
   if(contacendled == 1){
     //##########################################################################################
-       Serial.println("botao 1");
-       pix();
-       webhook();
- 
+       Serial.println("INICIA VALOR");
+
+       State = "valor";
+    
   }
   if(contacendled == 2){
   //##########################################################################################
@@ -183,80 +227,143 @@ void loop() {
       orders();
   }
   if(contacendled == 3){
-  //##########################################################################################
 
-  neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
-  Serial.println("botao 3"); 
-    webhook();      
   }
    if(contacendled == 4){
   neopixelWrite(RGB_BUILTIN,0,60,78); 
   Serial.println("botao 4");       
-  }
-
-
-
-}   
-
-     // Serial.println(contacendled);
-
-}
   
+  }}}
+
+void geravalor(){
+    buttonState = digitalRead(Button1); // Lê o estado do botão
+
+ if (buttonState == LOW) { // Se o botão estiver pressionado
+      Serial.println("botao pressionado GERAVALOR");
+      Serial.println(conta);
+
+      digitalWrite(RGB_BUILTIN, HIGH);
+      conta++;
+      delay(200); 
+      digitalWrite(RGB_BUILTIN, LOW);      
+      intervalo = millis();
+     
+      }
+
+  if(millis() > intervalo+15000){
+  conta = 0;
+}    
+  if(millis() > intervalo+5000){
+  if (ordervalue > 3) {State = "pix";}
+  else{State = "menu";}
+}    
+  if(millis() > intervalo+2000){
+          Serial.println("VALOR");
+          Serial.println(conta);
+          ordervalue = conta;
+}}
 
   void pix(){
-WiFiClient client;
-         current_status = STATUS_REQUEST_QRCODE;
+          current_status = STATUS_REQUEST_QRCODE;
           last_id++;
           save_nvs_data(last_id);
           sprintf(info, "Ultima Compra: %d", last_id);
           tft.setCursor(10, 460);
           tft.println(info);
-     
-
-  //http_get_qrcode(buffer, last_id);
-  // http_get_qrcode_test(buffer);
-  Serial.print("QR CODE: ");
-  Serial.println(buffer);
-  Serial.println("Gerando QR Code...");
- // bool ok = qrcodegen_encodeText(buffer, tempBuffer, qrcode,
-    //qrcodegen_Ecc_HIGH, qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
 
 
-  if (client.connect(host, 80)) 
+
+
+          client.setCACert(caCert);
+          HTTPClient https;
+    
+    String CHAVEPHP =   url;
+           CHAVEPHP +=  "?id=";
+           CHAVEPHP +=  last_id;
+           CHAVEPHP += "&value=";
+           CHAVEPHP +=  ordervalue;
+
+
+  neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
+
+  if (https.begin(CHAVEPHP)) 
   {
-  Serial.println(F("connected"));
 
-
+ Serial.print("[HTTPS] GET...\n");
+        // start connection and send HTTP header
+        int httpCode = https.GET();
   
-  String CHAVEPHP = "?id=";
-         CHAVEPHP += last_id;
-         CHAVEPHP += "";
+        // httpCode will be negative on error
+        if (httpCode > 0) {
+          // HTTP header has been send and Server response header has been handled
+          Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+
+            String payload = https.getString();
+            Serial.println(payload);
+            Serial.println(CHAVEPHP);
+
+           
+            }
+
+             Serial.println("ESPERANDO PAGAMENTO...");
+             delay(15000);
+             if (pagamento == 0){
+                           Serial.println("PAGAMENTO NAO EFETUADO");
+                           neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
+                           delay(2000);
+
+
+              }
+             if (pagamento == 1){
+                           Serial.println("PAGAMENTO APROVADO");
+                           Serial.println("PAGAMENTO de");
+                           Serial.println(ordervalue);
+}
 
 
 
-  client.print(F("GET ")); client.print(url); 
-  client.print(CHAVEPHP.c_str());  
-  Serial.print(CHAVEPHP.c_str()); 
-  //client.println(F(" HTTP/1.1")); 
- // client.println(F("Host: SomeHost"));
-  client.println();
-    neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
 
+            
+
+  neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
+
+  delay(1000);
+ 
+  Serial.println("");
+  Serial.println(F("Desconectando."));
+  https.end();
+
+  digitalWrite(RGB_BUILTIN, LOW);
+  
   } 
    else 
     {
-    Serial.println(F("connection failed")); Serial.println();
-      neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
+    Serial.println(F("Falha na conexao")); 
+    Serial.println();
+    neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
     }
-
-  while(client.connected() && !client.available()) delay(1); //waits for data
-  while (client.connected() || client.available()) 
-  { //connected or data available
-    char c = client.read();
-    Serial.print(c);
     
-  }
+
+
+
+
+
+
+  //http_get_qrcode(buffer, last_id);
+  // http_get_qrcode_test(buffer);
+  Serial.println("QR CODE FUNCAO");
+  Serial.print("VALOR:");
+  Serial.println(ordervalue);
+  Serial.println("QR CODE:");
+  Serial.println(buffer);
+  Serial.println("Gerando QR Code...");
+
+
+
+  bool ok = qrcodegen_encodeText(payload.c_str(), tempBuffer, qrcode, qrcodegen_Ecc_HIGH, qrcodegen_VERSION_MIN, qrcodegen_VERSION_MAX, qrcodegen_Mask_AUTO, true);
+
+
   tickNumber++;
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
   delay(1000);
@@ -277,8 +384,6 @@ WiFiClient client;
   
 
   client.print(F("GET ")); client.print(url2);  
-  client.println(F(" HTTP/1.0")); 
-  client.println(F("Host: SomeHost"));
   client.println();
     neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
@@ -308,59 +413,67 @@ WiFiClient client;
     
     
      void webhook(){
-WiFiClient client;
-
-
-  if (client.connect(host, 80)) 
-  {
-  Serial.println(F("connected"));
+client.setCACert(caCert);
+HTTPClient https;
     
-    String CHAVE2PHP =  "?external_id=";
+    String CHAVE2PHP =   url4;
+           CHAVE2PHP +=  "?external_id=";
            CHAVE2PHP +=  last_id;
            CHAVE2PHP += "&order_status=";
            CHAVE2PHP +=  pagamento;
+           CHAVE2PHP += "&order_value=";
+           CHAVE2PHP +=  ordervalue;
+           CHAVE2PHP += "&mac_value=";
+           CHAVE2PHP +=  WiFi.macAddress();
 
 
-  client.print(F("GET ")); 
-  client.print(url4); 
-  client.print(CHAVE2PHP.c_str());  
-  Serial.println(CHAVE2PHP.c_str());  
-//  client.println(F(" HTTP/1.0")); 
-//  client.println(F("Host: SomeHost"));
-  client.println();
-    neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
+  neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
 
+  if (https.begin(CHAVE2PHP)) 
+  {
 
-  } 
-   else 
-    {
-    Serial.println(F("connection failed")); Serial.println();
-      neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
-    }
+ Serial.print("[HTTPS] GET...\n");
+        // start connection and send HTTP header
+        int httpCode = https.GET();
+  
+        // httpCode will be negative on error
+        if (httpCode > 0) {
+          // HTTP header has been send and Server response header has been handled
+            Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+            String payload = https.getString();
+            Serial.println(payload);
+            Serial.println(CHAVE2PHP);
 
-  while(client.connected() && !client.available()) delay(1); //waits for data
-  while (client.connected() || client.available()) 
-  { //connected or data available
-    char c = client.read();
-    Serial.print(c);
-    
-  }
+            }
+            
+
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
+
   delay(1000);
  
   Serial.println("");
   Serial.println(F("Desconectando."));
-  client.stop();
+  https.end();
+
   digitalWrite(RGB_BUILTIN, LOW);
+  
+  } 
+   else 
+    {
+    Serial.println(F("connection failed")); 
+    Serial.println();
+    neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
+    }
+
+
 }
 
 
 
   
 
-uint32_t read_nvs_data()
-{
-  uint32_t last_id = 0;
+uint32_t read_nvs_data(){
+uint32_t last_id = 0;
   if (SPIFFS.begin(true))
   {
     File nvsFile = SPIFFS.open("/nvs.txt", "r");
@@ -373,8 +486,7 @@ uint32_t read_nvs_data()
   return last_id;
 }
 
-void save_nvs_data(uint32_t data)
-{
+void save_nvs_data(uint32_t data){
   if (SPIFFS.begin(true))
   {
     File nvsFile = SPIFFS.open("/nvs.txt", "w");
