@@ -1,12 +1,22 @@
 
 #include <WiFi.h>
 #include "Arduino.h"
-#include <WiFiMulti.h>
 #include <HTTPClient.h>
 WiFiClientSecure client;
-//#include "http_client.h"
 #include "time.h"
 #include "sntp.h"
+
+#include <WebServer.h>
+void saveWifiCredentials(const String &ssid, const String &password);
+
+// Cria um novo objeto WebServer
+WebServer server(80);
+
+bool wifiConnected = false;
+
+const char* ssid = ""; // Deixe em branco
+const char* password = ""; // Deixe em branco
+
 
 // Configuração do certificado CA (Certificado de Autoridade) para confiar no servidor remoto
 const char* caCert = \
@@ -45,8 +55,6 @@ const char* caCert = \
 #define CONTA_ID_KEY "contagrana"
 
 
-#define RXD2 44
-#define TXD2 43
 
 
 TFT_eSPI tft = TFT_eSPI();
@@ -90,9 +98,6 @@ uint8_t tempBuffer[qrcodegen_BUFFER_LEN_MAX];
 
 
 
-
-const char* ssid = "InternetSA";
-const char* password = "cadebabaca";
 const char* host = "santocyber.helioho.st";
 String url = "https://santocyber.helioho.st/pix-gateway/gravatele.php";
 String url2 = "http://santocyber.helioho.st/pix-gateway/v1/api_orders.php";
@@ -101,7 +106,6 @@ String url5 = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
 String State = "menu";
 String payload = "";
-String timeshow = "";
 
 int pagamento = 0;
 int ordervalue = 1;
@@ -118,6 +122,11 @@ unsigned long intervalo = 0;
 //###########################PCONFIGURACAO DAS PINAGENS
       int Button1 = 0;  // Pino do botão
 const int ledPin = 48;     // Pino do LED
+const int relayPin = 2; // Pino GPIO para o relé
+
+
+#define RXD2 44
+#define TXD2 43
 
 
 
@@ -136,37 +145,89 @@ unsigned long previousMillis = 0;
 const long interval = 30000; // Intervalo de 30 segundos
 
 
-
-
 void setClock() {
 
-  sntp_set_time_sync_notification_cb( timeavailable );
   sntp_servermode_dhcp(1);    // (optional)
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
 }
 
 
-void printLocalTime()
-{
- struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("No time available (yet)");
-    return;
+void handleRoot() {
+  String html = "<html><body>";
+  html += "<h1>CONFIG GRANANET:</h1>";
+  
+  // Adicionar um botão para escanear redes
+  html += "<form method='get' action='/scan'>";
+  html += "<input type='submit' value='Escanear Redes'>";
+  html += "</form>";
+
+  html += "<p>";
+
+  html += "</p>";
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
+}
+void handleScan() {
+  String html = "<html><body>";
+  html += "<h1>Selecione uma Rede Wi-Fi:</h1>";
+  html += "<form method='post' action='/connect'>";
+  html += "<ul>";
+
+  int n = WiFi.scanNetworks();
+  for (int i = 0; i < n; i++) {
+    String ssid = WiFi.SSID(i);
+    html += "<li>";
+    html += "<input type='radio' name='ssid' value='" + ssid + "'>" + ssid;
+    html += "</li>";
   }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+
+
+
+  // Se o formulário for enviado, salve as credenciais
+  if (server.method() == HTTP_POST) {
+    String selectedSSID = server.arg("ssid");
+    String enteredPassword = server.arg("password");
+    saveWifiCredentials(selectedSSID, enteredPassword);
+  }
+  
+  html += "</ul>";
+  html += "<label for='password'>Senha:</label><input type='password' name='password'><br>";
+  html += "<input type='submit' value='Conectar'>";
+  html += "</form>";
+  html += "<p><br><br><br><a href='/'>Voltar</a></p>";
+  html += "</body></html>";
+
+  server.send(200, "text/html", html);
 }
 
-// Callback function (get's called when time adjusts via NTP)
-void timeavailable(struct timeval *t)
-{
-  Serial.println("Got time adjustment from NTP!");
-  printLocalTime();
-}
+void handleConnect() {
+  String ssid = server.arg("ssid");
+  String password = server.arg("password");
+
+  // Verifique se o SSID e a senha não estão vazios
+  if (ssid.length() > 0 && password.length() > 0) {
+    WiFi.begin(ssid.c_str(), password.c_str());
+
+    // Aguarde a conexão ser estabelecida
+    int timeout = 10; // Tempo limite para a conexão em segundos
+    while (WiFi.status() != WL_CONNECTED && timeout > 0) {
+      delay(1000); // Aguarde 1 segundo
+      timeout--;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      server.send(200, "text/plain", "Conectado com sucesso! IP: " + WiFi.localIP().toString());
+      wifiConnected = true;
+    } else {
+      server.send(200, "text/plain", "n conectado!  ");
 
 
-WiFiMulti WiFiMulti;
+    }}}
 
 void setup() {
+  
+
 
   current_status = STATUS_WAIT_USER_INPUT;
   generate_qrcode = false;
@@ -180,7 +241,11 @@ void setup() {
   pinMode(Button1, INPUT); // Define o pino do botão como entrada
   pinMode(ledPin, OUTPUT);   // Define o pino do LED como saída
 
+  // Configurar o pino do relé como saída
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW); // Inicialmente, o relé está desligado
 
+  
     // Note the format for setting a serial port is as follows: Serial2.begin(baud-rate, protocol, RX pin, TX pin);
   Serial.begin(115200);
   //Serial1.begin(115200);
@@ -188,25 +253,45 @@ void setup() {
    Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
   
   // Serial.setDebugOutput(true);
+//#####################################################wifi scan
 
-  Serial.println();
-  Serial.println();
-  Serial.println();
-
-  WiFi.mode(WIFI_STA);
-  WiFiMulti.addAP("InternetSA", "cadebabaca");
-
-  // wait for WiFi connection
-  Serial.print("ESPERANDO WIFI CONECTAR...");
-  while ((WiFiMulti.run() != WL_CONNECTED)) {
-    Serial.print(".");
+ if (!SPIFFS.begin(true)) {
+    Serial.println("Falha ao montar o sistema de arquivos SPIFFS.");
+    return;
   }
-  Serial.println("connected");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+
+
+
+
+if (wifiConnected != true) {
+
+// Iniciar o modo AP
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("GRANANET-Config"); // Nome da rede AP
+  IPAddress myIP = WiFi.softAPIP();
+  Serial.print("Endereço IP do AP: ");
+  Serial.println(myIP);
+  // Inicializa a biblioteca WiFi
+  WiFi.begin();
+
+  }
+
+
+  // Inicializa o servidor web
+  server.on("/", handleRoot);
+  server.on("/scan", HTTP_GET, handleScan);
+  server.on("/connect", handleConnect);
+ // server.on("/desligar", handleDesligar);
+ // server.on("/ligar", handleLigar);
+  server.begin();
+
+  Serial.println("Servidor web iniciado");
+  
 
   setClock();  
 }
+
+
 String obterHoraAtual() {
 
     time_t agora = time(nullptr); // Obtemos a hora atual
@@ -222,8 +307,11 @@ String obterHoraAtual() {
 
 void loop() {
 
+  // Executa o servidor web
+  server.handleClient();
 
 
+if (wifiConnected) {
 unsigned long currentMillis = millis();
 
   // Verificar se passaram 30 segundos
@@ -236,19 +324,9 @@ unsigned long currentMillis = millis();
     gmtime_r(&now, &timeinfo);
     Serial.print("Hora atual: ");
     Serial.printf("%02d:%02d:%02d\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-
-
-
-
-
     telemetria();
   }
-
-
-
-
-
-
+}
 
  if (State == "menu") {
   menu();
@@ -264,7 +342,6 @@ unsigned long currentMillis = millis();
     State = "menu";
 
 }
-
 }
   
 void menu(){
@@ -339,10 +416,17 @@ void menu(){
   Serial.println("botao 10  apaga granaentrada obdjsiada");  
   delete_contagrana_data_file();
   delete_contaobj_data_file();
-
-
-
   Serial.println("apagando grana entrada");  
+
+  delay(2000);
+     State = "menu";     
+  
+  }
+   if(contacendled == 11){
+  neopixelWrite(RGB_BUILTIN,0,60,78); 
+  Serial.println("botao 11  apaga wifi");  
+deletewififile();
+  Serial.println("apagando wifi");  
 
   delay(2000);
      State = "menu";     
@@ -557,6 +641,8 @@ HTTPClient https;
            CHAVE2PHP +=  WiFi.macAddress();
            CHAVE2PHP += "&iplocal=";
            CHAVE2PHP +=  WiFi.localIP().toString();
+           CHAVE2PHP += "&wifilocal=";
+           CHAVE2PHP +=  WiFi.SSID();       
            CHAVE2PHP += "&timelocal=";
            CHAVE2PHP +=  horaAtual;
 
@@ -608,7 +694,38 @@ HTTPClient https;
 
 
 
-  
+//################################ Função para salvar o SSID e a senha no SPIFFS
+void saveWifiCredentials(const String &ssid, const String &password) {
+  File file = SPIFFS.open("/wifi_credentials.txt", "w");
+  if (!file) {
+    Serial.println("Erro ao abrir o arquivo para salvar as credenciais.");
+    return;
+  }
+
+  file.println(ssid);
+  file.println(password);
+  file.close();
+}
+
+// Função para carregar o SSID e a senha do SPIFFS
+void  loadWifiCredentials(String &ssid, String &password) {
+  File file = SPIFFS.open("/wifi_credentials.txt", "r");
+  if (!file) {
+    Serial.println("Arquivo de credenciais não encontrado.");
+    return;
+  }
+
+  ssid = file.readStringUntil('\n');
+  password = file.readStringUntil('\n');
+  file.close();
+}
+
+  void deletewififile() {
+String ssid0 ="0";
+String password0 ="0";
+        
+          saveWifiCredentials(ssid0,password0);
+}
 //#########################SALVANDO e apagando CONTADORES EM ARQUIVOS
 
 void delete_contagrana_data_file() {
@@ -672,12 +789,6 @@ void contaobj_data(uint32_t data){
     }
   }
 }
-
-
-
-
-
-
 
 
 
