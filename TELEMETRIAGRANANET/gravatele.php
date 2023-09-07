@@ -19,13 +19,25 @@ function sanitizeInput($input) {
 }
 
 // Verificar se os parâmetros necessários estão presentes na URL
-if (isset($_GET['granaentrada'])  && isset($_GET['objsaida']) && isset($_GET['iplocal']) && isset($_GET['timelocal']) && isset($_GET['mac_value']) ) {
+if (
+    isset($_GET['granaentrada']) &&
+    isset($_GET['objsaida']) &&
+    isset($_GET['iplocal']) &&
+    isset($_GET['wifilocal']) &&
+    isset($_GET['timelocal']) &&
+    isset($_GET['mac_value']) &&
+    isset($_GET['nomedobot']) &&
+    isset($_GET['acoes'])
+) {
     // Capturar e sanitizar os dados da URL
     $granaentrada = sanitizeInput($_GET['granaentrada']);
     $objsaida = sanitizeInput($_GET['objsaida']);
-	$ip = sanitizeInput($_GET['iplocal']);
-	$timelocal = sanitizeInput($_GET['timelocal']);
+    $ip = sanitizeInput($_GET['iplocal']);
+    $timelocal = sanitizeInput($_GET['timelocal']);
+    $wifilocal = sanitizeInput($_GET['wifilocal']);
     $mac_value = sanitizeInput($_GET['mac_value']);
+    $acoes = sanitizeInput($_GET['acoes']);
+	$nomedobot = sanitizeInput($_GET['nomedobot']);
     $last_update = date('Y-m-d H:i:s');
 
     // Verificar se a linha já existe na tabela com base no endereço MAC
@@ -35,8 +47,7 @@ if (isset($_GET['granaentrada'])  && isset($_GET['objsaida']) && isset($_GET['ip
     if ($result->num_rows > 0) {
         // A linha já existe, então vamos atualizá-la
         $updateSql = "UPDATE telemetria 
-                      SET ip = '$ip', objsaida = '$objsaida', granaentrada = '$granaentrada', timelocal = '$timelocal' 
-                      WHERE mac = '$mac_value'";
+                      SET ip = '$ip', objsaida = '$objsaida', granaentrada = '$granaentrada',wifilocal = '$wifilocal',acoes = '$acoes',nomedobot = '$nomedobot', timelocal = '$timelocal' WHERE mac = '$mac_value'";
 
         if ($conn->query($updateSql) === TRUE) {
             echo "Dados atualizados com sucesso na tabela";
@@ -45,8 +56,8 @@ if (isset($_GET['granaentrada'])  && isset($_GET['objsaida']) && isset($_GET['ip
         }
     } else {
         // A linha não existe, então vamos inseri-la
-        $insertSql = "INSERT INTO telemetria (mac, ip , objsaida, granaentrada, timelocal)
-                      VALUES ('$mac_value', '$ip', '$objsaida', '$granaentrada', '$timelocal')";
+        $insertSql = "INSERT INTO telemetria (mac, ip , objsaida, granaentrada, wifilocal, timelocal, nomedobot, acoes)
+                      VALUES ('$mac_value', '$ip', '$objsaida', '$granaentrada', '$wifilocal', '$timelocal, '$nomedobot, '$acoes')";
 
         if ($conn->query($insertSql) === TRUE) {
             echo "Dados inseridos com sucesso na tabela";
