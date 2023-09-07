@@ -26,8 +26,7 @@ if (
     isset($_GET['wifilocal']) &&
     isset($_GET['timelocal']) &&
     isset($_GET['mac_value']) &&
-    isset($_GET['nomedobot']) &&
-    isset($_GET['acoes'])
+    isset($_GET['nomedobot']) 
 ) {
     // Capturar e sanitizar os dados da URL
     $granaentrada = sanitizeInput($_GET['granaentrada']);
@@ -36,7 +35,6 @@ if (
     $timelocal = sanitizeInput($_GET['timelocal']);
     $wifilocal = sanitizeInput($_GET['wifilocal']);
     $mac_value = sanitizeInput($_GET['mac_value']);
-    $acoes = sanitizeInput($_GET['acoes']);
 	$nomedobot = sanitizeInput($_GET['nomedobot']);
     $last_update = date('Y-m-d H:i:s');
 
@@ -47,7 +45,7 @@ if (
     if ($result->num_rows > 0) {
         // A linha já existe, então vamos atualizá-la
         $updateSql = "UPDATE telemetria 
-                      SET ip = '$ip', objsaida = '$objsaida', granaentrada = '$granaentrada',wifilocal = '$wifilocal',acoes = '$acoes',nomedobot = '$nomedobot', timelocal = '$timelocal' WHERE mac = '$mac_value'";
+                      SET ip = '$ip', objsaida = '$objsaida', granaentrada = '$granaentrada',wifilocal = '$wifilocal', nome = '$nomedobot', timelocal = '$timelocal' WHERE mac = '$mac_value'";
 
         if ($conn->query($updateSql) === TRUE) {
             echo "Dados atualizados com sucesso na tabela";
@@ -56,8 +54,8 @@ if (
         }
     } else {
         // A linha não existe, então vamos inseri-la
-        $insertSql = "INSERT INTO telemetria (mac, ip , objsaida, granaentrada, wifilocal, timelocal, nomedobot, acoes)
-                      VALUES ('$mac_value', '$ip', '$objsaida', '$granaentrada', '$wifilocal', '$timelocal, '$nomedobot, '$acoes')";
+        $insertSql = "INSERT INTO telemetria (mac, ip , objsaida, granaentrada, wifilocal, timelocal, nome)
+                      VALUES ('$mac_value', '$ip', '$objsaida', '$granaentrada', '$wifilocal', '$timelocal, '$nomedobot)";
 
         if ($conn->query($insertSql) === TRUE) {
             echo "Dados inseridos com sucesso na tabela";
