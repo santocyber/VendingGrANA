@@ -6,6 +6,7 @@
 #include <HTTPClient.h>
 #include "time.h"
 #include "sntp.h"
+#include <ArduinoJson.h>
 
 #define _DISABLE_TLS_
 WiFiClientSecure client;
@@ -18,8 +19,6 @@ String password;
 String nomedobot;
 void saveWifiCredentials(const String &ssid, const String &password, const String &nomedobot);
 void loadWifiCredentials(String &ssid, String &password, String &nomedobot);
-//const char *ssid = "InternetSA";
-//const char *password = "cadebabaca";
 
 //##################### Configura IP
 
@@ -120,6 +119,8 @@ String url2 = "http://santocyber.helioho.st/pix-gateway/v1/api_orders.php";
 String url3 = "http://santocyber.helioho.st/pix-gateway/v1/api_webhook.php";
 String url5 = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
+String url6 = "https://santocyber.helioho.st/pix-gateway/registrar_acao.php";
+
 String State = "menu";
 String StateUpdate = "desativado";
 String payload = "";
@@ -157,7 +158,7 @@ const int   daylightOffset_sec = 0;
 const char* time_zone = "CET-3CEST,M3.5.0,M10.5.0/3";  // TimeZone rule for Europe/Rome including daylight adjustment rules (optional)
 
 
-//###########################################CONFIGURA O LOOP DE UPDATE NO SERVDIOR
+//###########################################CONFIGURA O LOOP DE UPDATE NO SERVDIOR SQL
 unsigned long previousMillis = 0;
 const long interval = 30000; // Intervalo de 30 segundos
 
@@ -472,7 +473,7 @@ void loop() {
   // Executa o servidor web
   server.handleClient();
 
-
+//##################################################LOOP SE CONECTADO
  if (StateUpdate == "ativo") {
 
 unsigned long currentMillis = millis();
@@ -488,6 +489,7 @@ unsigned long currentMillis = millis();
     Serial.print("Hora atual: ");
     Serial.printf("%02d:%02d:%02d\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     telemetria();
+    verifyActionAndExecute();
   }
 }
 
@@ -860,6 +862,59 @@ HTTPClient https;
 
 //##########################################VERIFICA FUNCOES PENDENTES NO SQL
 
+void verifyActionAndExecute() {
+  // Get the MAC address from the ESP32
+  //uint8_t mac[6];
+  //WiFi.macAddress(mac);
+
+  // Convert the MAC address to a string
+  //String macStr = String(mac[0], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[5], HEX);
+
+  // Make a HTTP request to the database to get the action information
+  HTTPClient httpClient;
+  httpClient.begin(url6 + "?mac=" + WiFi.macAddress());
+  int httpCode = httpClient.GET();
+
+  // Check the HTTP status code
+  if (httpCode == 200) {
+    // The action was found
+    String payload = httpClient.getString();
+    Serial.println(payload);
+
+    // Parse the JSON payload to get the action information
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, payload);
+
+    String action = doc["acoes"];
+
+    // Execute the action
+    if (action == "ligado") {
+      Serial.println("LIGADO PELO SQL");
+      digitalWrite(relayPin, HIGH);
+      neopixelWrite(RGB_BUILTIN, 0, 255, 127); // Pink
+    } else if (action == "desligado") {
+      Serial.println("DESLIGADO PELO SQL");
+      digitalWrite(relayPin, LOW);
+    } else if (action == "credito") {
+      Serial.println("ACAO CREDITO ATIVADO PELO SQL");
+      digitalWrite(relayPin, HIGH);
+      neopixelWrite(RGB_BUILTIN, 0, 255, 127); // Pink
+      delay(500);
+      neopixelWrite(RGB_BUILTIN, 0, 0, 0); // Pink
+      digitalWrite(relayPin, LOW);
+
+    } else {
+      Serial.println("Unknown action: " + action);
+      Serial.println(WiFi.macAddress());
+
+    }
+  } else {
+    // The action was not found
+    Serial.println("Action not found: " + WiFi.macAddress());
+  }
+
+  httpClient.end();
+}
 
 
 
