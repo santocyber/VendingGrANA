@@ -881,6 +881,8 @@ void verifyActionAndExecute() {
       digitalWrite(relayPin, LOW);
     } else if (action == "credito") {
       Serial.println("ACAO CREDITO ATIVADO PELO SQL");
+       contagrana++;
+       contagrana_data(contagrana);
       digitalWrite(relayPin, HIGH);
       neopixelWrite(RGB_BUILTIN, 0, 255, 127); // Pink
       delay(500);
