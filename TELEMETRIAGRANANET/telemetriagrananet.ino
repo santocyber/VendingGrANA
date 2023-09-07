@@ -119,7 +119,7 @@ String url2 = "http://santocyber.helioho.st/pix-gateway/v1/api_orders.php";
 String url3 = "http://santocyber.helioho.st/pix-gateway/v1/api_webhook.php";
 String url5 = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
-String url6 = "https://santocyber.helioho.st/pix-gateway/registrar_acao.php";
+String url6 = "https://santocyber.helioho.st/pix-gateway/verificaacao.php";
 
 String State = "menu";
 String StateUpdate = "desativado";
@@ -320,27 +320,12 @@ void handleConnect() {
 }
 
 
-String trim(String str) {
-  int startIdx = 0;
-  int endIdx = str.length() - 1;
-
-  // Encontra o índice do primeiro caractere não espaço em branco a partir do início.
-  while (startIdx <= endIdx && isspace(str.charAt(startIdx))) {
-    startIdx++;
-  }
-
-  // Encontra o índice do último caractere não espaço em branco a partir do final.
-  while (endIdx >= startIdx && isspace(str.charAt(endIdx))) {
-    endIdx--;
-  }
-
-  // Obtém a substring entre os índices encontrados.
-  return str.substring(startIdx, endIdx + 1);
-}
-
-
 bool initWiFi() {
   loadWifiCredentials(ssid, password, nomedobot);
+  ssid.trim();
+  password.trim();
+  nomedobot.trim();
+  
   WiFi.mode(WIFI_STA);
   
   if(ssid==""){
@@ -350,12 +335,8 @@ bool initWiFi() {
 
  // Verifique se o SSID e a senha não estão vazios
   if (ssid.length() > 0 && password.length() > 0) {
-   // WiFiMulti.addAP(ssid.c_str(), password.c_str());
 
-    String cleanedssid = trim(ssid);
-    String cleanedPassword = trim(password);
-
-    WiFi.begin(cleanedssid, cleanedPassword);
+    WiFi.begin(ssid, password);
     Serial.println("Connecting to WiFi...");
     Serial.println(ssid);
     Serial.println(password);
@@ -810,6 +791,9 @@ HTTPClient https;
            CHAVE2PHP +=  WiFi.SSID();       
            CHAVE2PHP += "&timelocal=";
            CHAVE2PHP +=  horaAtual;
+           CHAVE2PHP += "&nomedobot=";
+           CHAVE2PHP += nomedobot;
+
 
 
   
