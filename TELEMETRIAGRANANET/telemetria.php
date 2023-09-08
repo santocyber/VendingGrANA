@@ -60,6 +60,15 @@
             <button type="submit">Buscar</button>
         </form>
     </div>
+	<br>
+	    <!-- Botão para listar todas as linhas -->
+    <div class="search-container">
+        <form method="get">
+            <input type="hidden" name="listAll" value="1">
+            <button type="submit">Listar Tudo</button>
+        </form>
+    </div>
+	
 
     <div class="container">
         <?php
