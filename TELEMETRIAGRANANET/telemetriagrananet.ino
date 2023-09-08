@@ -17,8 +17,9 @@ bool wifiConnected = false;
 String ssid;
 String password;
 String nomedobot;
-void saveWifiCredentials(const String &ssid, const String &password, const String &nomedobot);
-void loadWifiCredentials(String &ssid, String &password, String &nomedobot);
+String geo;
+void saveWifiCredentials(const String &ssid, const String &password, const String &nomedobot, const String &geo);
+void loadWifiCredentials(String &ssid, String &password, String &nomedobot, String &geo);
 
 //##################### Configura IP
 
@@ -194,6 +195,8 @@ void handleMain() {
   html += "<h1>GRANANET WEBPAGE</h1>";
   html += "<h2>NOMEBOT:</h2>";
   html += "<p class='data'>" + nomedobot + "</p>";
+  html += "<h2>GEO:</h2>";
+  html += "<p class='data'>" + geo + "</p>";
   html += "<h2>SSID:</h2>";
   html += "<p class='data'>" + ssid + "</p>";
   html += "<h2>ENTRADA:</h2>";
@@ -206,7 +209,7 @@ void handleMain() {
 }
 
 void handleRoot() {
-  loadWifiCredentials(ssid, password, nomedobot);
+  loadWifiCredentials(ssid, password, nomedobot,geo);
 
   String html = "<html><head>";
   html += "<style>";
@@ -221,6 +224,8 @@ void handleRoot() {
   html += "<h1>CONFIG GRANANET</h1>";
   html += "<h2>NOMEBOT:</h2>";
   html += "<p class='data'>" + nomedobot + "</p>";
+  html += "<h2>GEO:</h2>";
+  html += "<p class='data'>" + geo + "</p>";
   html += "<h2>SSID:</h2>";
   html += "<p class='data'>" + ssid + "</p>";
   html += "<h2>password:</h2>";
@@ -270,7 +275,8 @@ void handleScan() {
   }}
 
   html += "</ul>";
-  html += "<label for='ssid'>NOMEDOBOT:</label><input type='text' name='nomedobot'><br>";
+  html += "<label for='nomedobot'>NOMEDOBOT:</label><input type='text' name='nomedobot'><br>";
+  html += "<label for='geo'>GEOLOCALIZACAO:</label><input type='text' name='geo'><br>";
   html += "<label for='password'>Password:</label><input type='password' name='password'><br>";
   html += "<input type='submit' value='CONECTAR'>";
   html += "</form>";
@@ -288,7 +294,8 @@ void handleConnect() {
   String ssid = server.arg("ssid");
   String password = server.arg("password");
   String nomedobot = server.arg("nomedobot");
-  saveWifiCredentials(ssid.c_str(), password.c_str(), nomedobot.c_str());
+  String geo = server.arg("geo");
+saveWifiCredentials(ssid.c_str(), password.c_str(), nomedobot.c_str(), geo.c_str());
 
   // Verifique se o SSID e a senha não estão vazios
   if (ssid.length() > 0 && password.length() > 0) {
@@ -322,7 +329,7 @@ void handleConnect() {
 
 
 bool initWiFi() {
-  loadWifiCredentials(ssid, password, nomedobot);
+  loadWifiCredentials(ssid, password, nomedobot,geo);
   ssid.trim();
   password.trim();
   nomedobot.trim();
@@ -339,9 +346,10 @@ bool initWiFi() {
 
     WiFi.begin(ssid, password);
     Serial.println("Connecting to WiFi...");
-    Serial.println(ssid);
-    Serial.println(password);
-    Serial.println(nomedobot);
+    Serial.println(ssid.c_str());
+    Serial.println(password.c_str());
+    Serial.println(nomedobot.c_str());
+    Serial.println(geo.c_str());
     }
    delay(5000);
   if (WiFi.status() == WL_CONNECTED) {
@@ -780,8 +788,15 @@ HTTPClient https;
   String horaAtual = obterHoraAtual();
     Serial.print("Hora atual:");
     Serial.println(horaAtual);
+          
+           String geoSemEspacos = "";
+    // Remover espaços em branco da string 'geo'
+for (int i = 0; i < geo.length(); i++) {
+    if (geo[i] != ' ') {
+        geoSemEspacos += geo[i];
+    }
+}
 
-    
     String CHAVE2PHP =   url;
            CHAVE2PHP += "?&granaentrada=";
            CHAVE2PHP +=  contagrana;
@@ -798,6 +813,10 @@ HTTPClient https;
            CHAVE2PHP += "&nomedobot=";
            nomedobot.trim();
            CHAVE2PHP += nomedobot;
+           CHAVE2PHP += "&geo=";
+           geoSemEspacos.trim();
+           CHAVE2PHP += geoSemEspacos;
+
 
 
 
@@ -953,7 +972,7 @@ void verifyActionAndExecute() {
       Serial.println("CREDITO PELO SQL");
      funcaocreditoleapaga();
     neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
-    delay(4000);
+    delay(400);
     neopixelWrite(RGB_BUILTIN, 0, 0, 0);
        
     } else if (action == "reinicia") {
@@ -980,7 +999,7 @@ void verifyActionAndExecute() {
 
 
 //################################ Função para salvar o SSID e a senha no SPIFFS
-void saveWifiCredentials(const String &ssid, const String &password, const String &nomedobot) {
+void saveWifiCredentials(const String &ssid, const String &password, const String &nomedobot, const String &geo) {
   File file = SPIFFS.open("/wifi_credentials.txt", "w");
   if (!file) {
     Serial.println("Erro ao abrir o arquivo para salvar as credenciais.");
@@ -990,12 +1009,13 @@ void saveWifiCredentials(const String &ssid, const String &password, const Strin
   file.println(ssid);
   file.println(password);
   file.println(nomedobot);
+  file.println(geo);
 
   file.close();
 }
 
 // Função para carregar o SSID e a senha do SPIFFS
-void  loadWifiCredentials(String &ssid, String &password, String &nomedobot) {
+void  loadWifiCredentials(String &ssid, String &password, String &nomedobot, String &geo) {
   File file = SPIFFS.open("/wifi_credentials.txt", "r");
   if (!file) {
     Serial.println("Arquivo de credenciais não encontrado.");
@@ -1005,6 +1025,7 @@ void  loadWifiCredentials(String &ssid, String &password, String &nomedobot) {
   ssid = file.readStringUntil('\n');
   password = file.readStringUntil('\n');
   nomedobot = file.readStringUntil('\n');
+  geo = file.readStringUntil('\n');
 
   file.close();
 }
@@ -1013,8 +1034,9 @@ void  loadWifiCredentials(String &ssid, String &password, String &nomedobot) {
 String ssid0 ="";
 String password0 ="";
 String nomedobot0 ="";
+String geo0 ="";
         
-          saveWifiCredentials(ssid0,password0,nomedobot0);
+          saveWifiCredentials(ssid0,password0,nomedobot0,geo0);
           ESP.restart();
 
 }
