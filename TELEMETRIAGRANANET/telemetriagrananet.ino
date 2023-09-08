@@ -120,6 +120,7 @@ String url3 = "http://santocyber.helioho.st/pix-gateway/v1/api_webhook.php";
 String url5 = "http://santocyber.helioho.st/pix-gateway/v1/api_qrcode.php";
 String url4 = "http://santocyber.helioho.st/pix-gateway/test.php";
 String url6 = "https://santocyber.helioho.st/pix-gateway/verificaacao.php";
+String url7 = "https://santocyber.helioho.st/pix-gateway/api.php";
 
 String State = "menu";
 String StateUpdate = "desativado";
@@ -170,7 +171,7 @@ String obterHoraAtual() {
     localtime_r(&agora, &infoTempo); // Converte o tempo em uma estrutura tm
 
     char buffer[20]; // Buffer para armazenar a hora formatada (HH:MM:SS\0)
-    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d_%04d-%02d-%02d", infoTempo.tm_hour, infoTempo.tm_min, infoTempo.tm_sec, infoTempo.tm_year + 1900, infoTempo.tm_mday, infoTempo.tm_mon + 1);
+    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d_%02d/%02d/%04d", infoTempo.tm_hour, infoTempo.tm_min, infoTempo.tm_sec, infoTempo.tm_mday, infoTempo.tm_mon + 1, infoTempo.tm_year + 1900);
              
     return String(buffer);
 }
@@ -585,6 +586,9 @@ deletewififile();
   
   }}
 
+
+//####################################GERA VALOR PIX
+
 void geravalor(){
     buttonState = digitalRead(Button1); // Lê o estado do botão
 
@@ -759,7 +763,7 @@ WiFiClient client;
     
   }
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
-  delay(1000);
+  delay(500);
  
   Serial.println("");
   Serial.println(F("Desconectando."));
@@ -792,6 +796,7 @@ HTTPClient https;
            CHAVE2PHP += "&timelocal=";
            CHAVE2PHP +=  horaAtual;
            CHAVE2PHP += "&nomedobot=";
+           nomedobot.trim();
            CHAVE2PHP += nomedobot;
 
 
@@ -822,7 +827,7 @@ HTTPClient https;
 
   neopixelWrite(RGB_BUILTIN,0,0,RGB_BRIGHTNESS); // Blue
 
-  delay(1000);
+  delay(500);
  
   Serial.println("");
   Serial.println(F("Desconectando."));
@@ -841,7 +846,72 @@ HTTPClient https;
 
 }
 
+//#######################################################
 
+void funcaocreditoleapaga() {
+  HTTPClient http;
+
+  // Fazer uma solicitação GET para a API PHP
+  http.begin(url7 + "?mac=" + WiFi.macAddress());
+
+  int httpResponseCode = http.GET();
+  if (httpResponseCode == HTTP_CODE_OK) {
+    String payload = http.getString();
+    payload.trim();
+    Serial.println("Resposta da API: " + payload);
+
+    // Parse the JSON payload to get the action information
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, payload);
+
+    if (error) {
+      Serial.println("Erro ao analisar JSON: " + String(error.c_str()));
+    } else {
+      String credit = doc["credito"];
+            
+      Serial.println("Valor do campo 'credito' no JSON:");
+      Serial.println(credit);
+
+      // Verificar se o payload é composto apenas por dígitos
+      bool isNumeric = true;
+      for (size_t i = 0; i < credit.length(); i++) {
+        if (!isDigit(credit.charAt(i))) {
+          isNumeric = false;
+          break;
+        }
+      }
+
+      if (isNumeric) {
+        // Converter a string para um número inteiro
+        int credito = credit.toInt();
+        // Aqui você pode usar o valor inteiro 'credito' conforme necessário
+        // contagrana += credito;
+        // contagrana_data(contagrana);
+        Serial.println("Valor Crédito Adicionado: " + String(credito));
+
+
+      // Controlar o LED para piscar 'credito' vezes
+        for (int i = 0; i < credito; i++) {
+      neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
+          delay(300); // Aguardar 500 ms (0,5 segundo)
+      neopixelWrite(RGB_BUILTIN,0,0,0);
+          delay(300); // Aguardar 500 ms (0,5 segundo)
+        }
+
+        
+          contagrana += credito;
+          contagrana_data(contagrana);
+      } else {
+        Serial.println("Erro: O campo 'credito' não é um número válido.");
+        Serial.println(payload);
+      }
+    }
+  } else {
+    Serial.println("Erro na solicitação HTTP: " + http.errorToString(httpResponseCode));
+  }
+
+  http.end();
+}
 
 
 //##########################################VERIFICA FUNCOES PENDENTES NO SQL
@@ -850,7 +920,6 @@ void verifyActionAndExecute() {
   // Get the MAC address from the ESP32
   //uint8_t mac[6];
   //WiFi.macAddress(mac);
-
   // Convert the MAC address to a string
   //String macStr = String(mac[0], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[5], HEX);
 
@@ -875,19 +944,25 @@ void verifyActionAndExecute() {
     if (action == "ligado") {
       Serial.println("LIGADO PELO SQL");
       digitalWrite(relayPin, HIGH);
-      neopixelWrite(RGB_BUILTIN, 0, 255, 127); // Pink
+      neopixelWrite(RGB_BUILTIN,0,RGB_BRIGHTNESS,0); // Green
     } else if (action == "desligado") {
       Serial.println("DESLIGADO PELO SQL");
+      neopixelWrite(RGB_BUILTIN, 0, 0, 0);
       digitalWrite(relayPin, LOW);
     } else if (action == "credito") {
-      Serial.println("ACAO CREDITO ATIVADO PELO SQL");
-       contagrana++;
-       contagrana_data(contagrana);
-      digitalWrite(relayPin, HIGH);
-      neopixelWrite(RGB_BUILTIN, 0, 255, 127); // Pink
-      delay(500);
-      neopixelWrite(RGB_BUILTIN, 0, 0, 0); // Pink
+      Serial.println("CREDITO PELO SQL");
+     funcaocreditoleapaga();
+    neopixelWrite(RGB_BUILTIN,RGB_BRIGHTNESS,0,0); // Red
+    delay(4000);
+    neopixelWrite(RGB_BUILTIN, 0, 0, 0);
+       
+    } else if (action == "reinicia") {
+      Serial.println("REINICIA PELO SQL");
       digitalWrite(relayPin, LOW);
+      neopixelWrite(RGB_BUILTIN, 255, 255, 127); // Yellow    
+      delay(4000);
+      neopixelWrite(RGB_BUILTIN, 0, 0, 0); // Pink
+      digitalWrite(relayPin, HIGH);
 
     } else {
       Serial.println("Unknown action: " + action);
