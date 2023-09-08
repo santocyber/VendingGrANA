@@ -101,7 +101,7 @@
             }
 
             // Construir a consulta base
-            $query = "SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes, parceiros, credito FROM telemetria";
+            $query = "SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes, parceiros,geolocalizacao, credito FROM telemetria";
 
             if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 if (isset($_GET['searchTerm'])) {
@@ -142,6 +142,8 @@
                 echo "<tr><td>Hora no local: {$linha['timelocal']}</td></tr>";
                 echo "<tr><td>Última Atualização: {$linha['last_update']}</td></tr>";
                 echo "<tr><td>Parceiros: {$linha['parceiros']}</td></tr>";
+		        echo "<tr><td>Geolocalização: {$linha['geolocalizacao']}</td></tr>";
+
                 echo "</table>";
                 echo "</div>";
 
