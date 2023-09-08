@@ -15,7 +15,7 @@
         }
         .container {
             display: flex;
-            flex-direction: column; /* Alterado para coluna */
+            flex-direction: column;
         }
         .card {
             border: 1px solid #ddd;
@@ -52,6 +52,15 @@
 <body>
     <h1>Telemetria GrANANET</h1>
 
+    <!-- Formulário de busca -->
+    <div class="search-container">
+        <form method="get">
+            <label for="searchTerm">Buscar por Identificador, MAC, Nome, Wi-Fi Local ou Ações:</label>
+            <input type="text" id="searchTerm" name="searchTerm" required>
+            <button type="submit">Buscar</button>
+        </form>
+    </div>
+
     <div class="container">
         <?php
         try {
@@ -69,10 +78,29 @@
                 $stmt->execute();
             }
 
-            $consulta = $pdo->query("SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes FROM telemetria;");
-            $somaGranaEntrada = 0; // Variável para armazenar a soma dos valores de 'granaentrada'
+            // Construir a consulta base
+            $query = "SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes FROM telemetria";
 
-            while ($linha = $consulta->fetch(PDO::FETCH_ASSOC)) {
+            if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+                if (isset($_GET['searchTerm'])) {
+                    $searchTerm = $_GET['searchTerm'];
+                    $query .= " WHERE mac LIKE :searchTerm OR nome LIKE :searchTerm OR wifilocal LIKE :searchTerm OR identificador LIKE :searchTerm OR acoes LIKE :searchTerm";
+                } elseif (isset($_GET['listAll'])) {
+                    // Se a opção de listar todos for selecionada, não é necessário modificar a consulta
+                }
+            }
+
+            $stmt = $pdo->prepare($query);
+
+            if (isset($searchTerm)) {
+                $stmt->bindValue(':searchTerm', '%' . $searchTerm . '%', PDO::PARAM_STR);
+            }
+
+            $stmt->execute();
+
+            $totalGranaentrada = 0;
+
+            while ($linha = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 echo "<div class='card'>";
                 echo "<table>";
                 echo "<tr><th>Informações</th><th>Ação</th></tr>";
@@ -88,15 +116,13 @@
                 echo "</table>";
                 echo "</div>";
 
-                // Adicione o valor de 'granaentrada' à soma
-                $somaGranaEntrada += $linha['granaentrada'];
+                $totalGranaentrada += floatval($linha['granaentrada']);
             }
 
-            // Exiba a soma dos valores de 'granaentrada' no final da página
             echo "<div class='card'>";
             echo "<table>";
-            echo "<tr><th>Total de granaentrada</th></tr>";
-            echo "<tr><td>{$somaGranaEntrada}</td></tr>";
+            echo "<tr><th>Total Granaentrada</th></tr>";
+            echo "<tr><td>{$totalGranaentrada}</td></tr>";
             echo "</table>";
             echo "</div>";
         } catch (PDOException $e) {
