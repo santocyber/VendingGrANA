@@ -55,20 +55,19 @@
     <!-- Formulário de busca -->
     <div class="search-container">
         <form method="get">
-            <label for="searchTerm">Buscar por Identificador, MAC, Nome, Wi-Fi Local ou Ações:</label>
+            <label for="searchTerm">Buscar por Identificador, MAC, Nome, Wi-Fi Local, Ações ou Parceiros:</label>
             <input type="text" id="searchTerm" name="searchTerm" required>
             <button type="submit">Buscar</button>
         </form>
     </div>
-	<br>
-	    <!-- Botão para listar todas as linhas -->
+<br>
+    <!-- Botão para listar todas as linhas -->
     <div class="search-container">
         <form method="get">
             <input type="hidden" name="listAll" value="1">
             <button type="submit">Listar Tudo</button>
         </form>
     </div>
-	
 
     <div class="container">
         <?php
@@ -88,14 +87,14 @@
             }
 
             // Construir a consulta base
-            $query = "SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes FROM telemetria";
+            $query = "SELECT identificador, nome, ip, granaentrada, objsaida, mac, timelocal, wifilocal, last_update, acoes, parceiros FROM telemetria";
 
             if ($_SERVER['REQUEST_METHOD'] === 'GET') {
                 if (isset($_GET['searchTerm'])) {
                     $searchTerm = $_GET['searchTerm'];
-                    $query .= " WHERE mac LIKE :searchTerm OR nome LIKE :searchTerm OR wifilocal LIKE :searchTerm OR identificador LIKE :searchTerm OR acoes LIKE :searchTerm";
+                    $query .= " WHERE mac LIKE :searchTerm OR nome LIKE :searchTerm OR wifilocal LIKE :searchTerm OR identificador LIKE :searchTerm OR acoes LIKE :searchTerm OR parceiros LIKE :searchTerm";
                 } elseif (isset($_GET['listAll'])) {
-                    // Se a opção de listar todos for selecionada, não é necessário modificar a consulta
+                    // Se a opção de listar todas for selecionada, não é necessário modificar a consulta
                 }
             }
 
@@ -122,6 +121,7 @@
                 echo "<tr><td>WiFilocal: {$linha['wifilocal']}</td></tr>";
                 echo "<tr><td>Hora no local: {$linha['timelocal']}</td></tr>";
                 echo "<tr><td>Última Atualização: {$linha['last_update']}</td></tr>";
+                echo "<tr><td>Parceiros: {$linha['parceiros']}</td></tr>";
                 echo "</table>";
                 echo "</div>";
 
